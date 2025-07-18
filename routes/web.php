@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\AnalysisController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -8,12 +9,18 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/top', function () {
-    return view('top');
-})->middleware(['auth', 'verified'])->name('top');
+//createの追加ルート 睡眠、運動用
+Route::middleware('auth')->group(function () {
+    Route::get('/activities/sleep', [ActivityController::class, 'sleepCreate'])->name('activities.sleepCreate');
+    Route::get('/activities/exercise', [ActivityController::class, 'exerciseCreate'])->name('activities.exerciseCreate');
+});
 
 Route::resource('/activities', ActivityController::class)
 ->middleware(['auth', 'verified']);
+
+Route::middleware('auth')->group(function () {
+    Route::get('/analysis/time', [AnalysisController::class, 'timeGraph'])->name('analysis.timeGraph');
+});
 
 Route::get('/dashboard', function () {
     return view('dashboard');

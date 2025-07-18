@@ -28,7 +28,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('top', absolute: false));
+        return redirect()->intended(route('activities.index', absolute: false));
     }
 
     /**

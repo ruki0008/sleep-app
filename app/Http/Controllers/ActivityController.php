@@ -26,6 +26,16 @@ class ActivityController extends Controller
         return view('activities.create');
     }
 
+    public function sleepCreate()
+    {
+        return view('activities.sleep');
+    }
+
+    public function exerciseCreate()
+    {
+        return view('activities.exercise');
+    }
+
     /**
      * Store a newly created resource in storage.
      */
@@ -33,6 +43,7 @@ class ActivityController extends Controller
     {
         //バリデーション
         $request->validate([
+            'type' => 'required',
             'date' => 'required|date',
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i',
@@ -47,6 +58,24 @@ class ActivityController extends Controller
         {
             $end->addDay();
         }
+
+        // 重複チェック
+        $exists = Activity::where('user_id', Auth::id())
+        ->where(function ($query) use ($start, $end) {
+            $query->whereBetween('start_time', [$start, $end])
+            ->orWhereBetween('end_time', [$start, $end])
+            ->orWhere(function ($query2) use ($start, $end) {
+                $query2->where('start_time', '<=', $start)
+                ->where('end_time', '>=', $end);
+            });
+        })
+        ->exists();
+
+        if ($exists) {
+            return back()
+            ->withErrors(['time' => '指定した時間はすでに他の記録と重複しています。'])
+            ->withInput();
+        }
         $diff = $start->diff($end);
         $hours = $diff->h + $diff->d * 24;
         $minutes = $diff->i;
@@ -56,6 +85,7 @@ class ActivityController extends Controller
         
         $activity = Activity::create([
             'user_id' => Auth::id(),
+            'type' => $request->type,
             'start_time' => $start,
             'end_time' => $end,
             'duration' => $duration,

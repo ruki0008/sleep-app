@@ -12,7 +12,7 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('activities.create')" :active="request()->routeIs('dashboard')">
+                    <x-nav-link :href="route('activities.sleepCreate')" :active="request()->routeIs('dashboard')">
                         登録画面
                     </x-nav-link>
                 </div>

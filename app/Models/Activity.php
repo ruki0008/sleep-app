@@ -13,6 +13,7 @@ class Activity extends Model
 
     protected $fillable = [
         'user_id',
+        'type',
         'start_time',
         'end_time',
         'duration',
