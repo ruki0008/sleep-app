@@ -12,14 +12,13 @@ class AnalysisController extends Controller
     {
         $activities = Activity::orderBy('start_time')->get();
         
-        $graph_datas = [];
         $graph_data = [];
 
         foreach ($activities as $activity) {
             $start = Carbon::parse($activity->start_time);
             $end = Carbon::parse($activity->end_time);
 
-            $dateKey = $start->format('Y-m-d'); //表示上の縦軸（日）
+            // $dateKey = $start->format('Y-m-d'); //表示上の縦軸（日）
             $start_t = $start->format('H:i'); //11:0
             $end_t = $end->format('H:i'); //9:15
 
@@ -32,17 +31,25 @@ class AnalysisController extends Controller
             $end_hours = $e_hour + round(($e_minute / 60), 1);
 
             // 翌日になった場合（例：23:00 → 06:00）
-            if ($end < $start) {
+            if ($end_hours < $start_hours) {
+                $end_hours += 24;
+            }elseif($start_hours < 11){
+                $start_hours += 24;
                 $end_hours += 24;
             }
 
+            $date_key = $start->format('Y-m-d'); //表示上の縦軸（日）
+            
             $graph_data[] = [
-                'date' => $dateKey,
+                // 'label_date' => $label_dateKey,
+                'date' => $date_key,
                 'weekday' => $start->isoFormat('dd'), // 月火水…
                 'start' => $start_hours,
-                'end' => $end_hours
+                'end' => $end_hours,
+                'type' => $activity->type,
+                'start_t' => $start_t,
+                'end_t' => $end_t
             ];
-            // $graphDatas[] = $graph_data;
         }
         return view('analysis.activitiyTime', ['graph_data' => $graph_data]);
     }

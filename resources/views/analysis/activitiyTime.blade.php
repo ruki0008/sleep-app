@@ -4,9 +4,11 @@
             睡眠グラフ
         </h2>
     </x-slot>
-
-    <div class="py-12 px-4">
-        <canvas id="sleepChart" width="800" height="400"></canvas>
+    <div class="text-center mt-2">
+        <span class="bg-blue-300 text-white p-1 rounded">睡眠</span><span class="bg-red-300 text-white p-1 rounded">運動</span>
+    </div>
+    <div class="px-4">
+        <canvas id="sleepChart" class="w-full h-full"></canvas>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -15,21 +17,35 @@
         const graphData = @json($graph_data);
 
         const labels = graphData.map(item => `${item.weekday} (${item.date})`);
-        const sleepData = [];
+        // const sleepData = [];
+        
+        //typeがsleepなら青、exerciseなら赤
+        const backgroundColor = graphData.map(item =>
+            item.type === 'sleep'
+                ? 'rgba(54, 162, 235, 0.6)'
+                : 'rgba(255, 57, 107, 0.5)'
+        );
 
+        // const dataset_label = graphData.map(item =>
+        //     item.type === 'sleep'
+        //         ? '睡眠時間'
+        //         : '運動時間'
+        // );
+        // console.log(backgroundColor, dataset_label);
+        
         const dataset = {
-            label: '睡眠時間',
+            label: '時間',
             data: graphData.map(item => ({
                 x: [item.start, item.end],
                 y: `${item.weekday} (${item.date})`
             })),
-            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            backgroundColor: backgroundColor,
             borderRadius: 5,
             borderSkipped: false,
             minBarLength: 2 
         };
         
-        console.log(dataset);
+        
         const ctx = document.getElementById('sleepChart').getContext('2d');
         new Chart(ctx, {
             type: 'bar',
@@ -38,6 +54,8 @@
                 datasets: [dataset]
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 indexAxis: 'y',
                 scales: {
                     x: {
@@ -63,7 +81,15 @@
                     }
                 },
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = graphData[context.dataIndex];
+                                return `時間: ${item.start_t}〜${item.end_t}`;
+                            }
+                        }
+                    }
                 }
             }
         });

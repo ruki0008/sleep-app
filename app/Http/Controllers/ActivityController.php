@@ -76,22 +76,89 @@ class ActivityController extends Controller
             ->withErrors(['time' => '指定した時間はすでに他の記録と重複しています。'])
             ->withInput();
         }
-        $diff = $start->diff($end);
-        $hours = $diff->h + $diff->d * 24;
-        $minutes = $diff->i;
-
-        $duration = "{$hours}時間{$minutes}分";
-        // dd($start, $end, $duration);
+        // function duration($start, $end){
+        //     $diff = $start->diff($end);
+        //     $hours = $diff->h + $diff->d * 24;
+        //     $minutes = $diff->i;
+    
+        //     $duration = "{$hours}時間{$minutes}分";
+        //     return $duration;
+        // }
         
-        $activity = Activity::create([
-            'user_id' => Auth::id(),
-            'type' => $request->type,
-            'start_time' => $start,
-            'end_time' => $end,
-            'duration' => $duration,
-            'quality' => $request->quality,
-            'memo' => $request->memo
-        ]);
+        $activities = [];
+        //11時でグラフが切れるため、11時を挟んでいたらデータを分ける
+        $start_h = intval($start->format('H'));
+        $end_h = intval($end->format('H'));
+        if($start_h < $end_h){
+            if($start_h < 11 & 11 < $end_h){
+                //11時で区切ると表示ができないため
+                $center_e = $start->copy()->setTime(11, 00);
+                $center_s = $center_e->addDay();
+                $duration1 = $this->duration($start, $center_e);
+                $activities[] = [
+                    'start_time' => $start,
+                    'end_time' => $center_e,
+                    'duration' => $duration1,
+                ];
+                $duration2 = $this->duration($center_s, $end);
+                $activities[] = [
+                    'start_time' => $center_s,
+                    'end_time' => $end->copy()->addDay(),
+                    'duration' => $duration2,
+                ];
+            }else{
+                $duration3 = $this->duration($start, $end);
+                $activities[] = [
+                    'start_time' => $start,
+                    'end_time' => $end,
+                    'duration' => $duration3,
+                ];
+            }
+        }elseif($start_h > $end_h){
+            if($end_h > 11){
+                $center_e = $start->copy()->setTime(11, 00);
+                $center_s = $center_e->addDay();
+                $duration1 = $this->duration($start, $center_e);
+                $activities[] = [
+                    'start_time' => $start,
+                    'end_time' => $center_e,
+                    'duration' => $duration1,
+                ];
+                $duration2 = $this->duration($center_s, $end);
+                $activities[] = [
+                    'start_time' => $center_s,
+                    'end_time' => $end->copy()->addDay(),
+                    'duration' => $duration2,
+                ];
+            }else{
+                $duration3 = $this->duration($start, $end);
+                $activities[] = [
+                    'start_time' => $start,
+                    'end_time' => $end,
+                    'duration' => $duration3,
+                ];
+            }
+        }else {
+            // start_h == end_h のとき（例：14:00〜14:30）
+            $duration3 = $this->duration($start, $end);
+            $activities[] = [
+                'start_time' => $start,
+                'end_time' => $end,
+                'duration' => $duration3,
+            ];
+        }
+        
+        foreach ($activities as $data) {
+            $activity = Activity::create([
+                'user_id' => Auth::id(),
+                'type' => $request->type,
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'duration' => $data['duration'],
+                'quality' => $request->quality,
+                'memo' => $request->memo
+            ]);
+        }
         
         $request->session()->flash('message', '保存しました');
         return to_route('activities.index');
@@ -127,5 +194,14 @@ class ActivityController extends Controller
     public function destroy(Activity $activity)
     {
         //
+    }
+
+    private function duration(Carbon $start, Carbon $end): string
+    {
+        $diff = $start->diff($end);
+        $hours = $diff->h + $diff->d * 24;
+        $minutes = $diff->i;
+
+        return "{$hours}時間{$minutes}分";
     }
 }
