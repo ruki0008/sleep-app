@@ -38,19 +38,24 @@ class AnalysisController extends Controller
                 $end_hours += 24;
             }
 
+            $year_key = $start->format('Y'); //月で分ける
+            $month_key = $start->format('m'); //月で分ける
             $date_key = $start->format('Y-m-d'); //表示上の縦軸（日）
             
-            $graph_data[] = [
-                // 'label_date' => $label_dateKey,
+            $graph_data[$year_key][$month_key][] = [
+                'id' => $activity->id,
                 'date' => $date_key,
+                'month' => $month_key,
                 'weekday' => $start->isoFormat('dd'), // 月火水…
                 'start' => $start_hours,
                 'end' => $end_hours,
                 'type' => $activity->type,
                 'start_t' => $start_t,
-                'end_t' => $end_t
+                'end_t' => $end_t,
+                'memo' => $activity->memo
             ];
         }
-        return view('analysis.activitiyTime', ['graph_data' => $graph_data]);
+        return view('analysis.activitiyTime', compact('activities', 'graph_data'));
+        // return view('analysis.activitiyTime', ['graph_data' => $graph_data]);
     }
 }

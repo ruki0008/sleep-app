@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('type');
             $table->dateTime('start_time');
             $table->dateTime('end_time');
-            $table->string('duration');
+            $table->double('duration');
             $table->tinyInteger('quality');
             $table->text('memo')->nullable();
             $table->timestamps();

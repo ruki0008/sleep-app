@@ -7,6 +7,8 @@ use App\Http\Requests\UpdateActivityRequest;
 use App\Models\Activity;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class ActivityController extends Controller
 {
@@ -15,7 +17,22 @@ class ActivityController extends Controller
      */
     public function index()
     {
-        return view('activities.index');
+        $sleep = Activity::where('type', '=', 'sleep');
+        $exercise = Activity::where('type', '=', 'exercise');
+        $s_sum = $sleep->sum('duration');
+        $e_sum = $exercise->sum('duration');
+
+        $s_count = Activity::where('type', '=', 'sleep')
+        ->select(DB::raw('DATE(start_time) as date'))
+        ->distinct()
+        ->get()
+        ->count();
+        $e_count = Activity::where('type', '=', 'exercise')
+        ->count();
+        $s_avg = round($s_sum / $s_count, 1);
+        $e_avg = round($e_sum / $e_count, 1);
+        
+        return view('activities.index', compact('s_sum', 'e_sum', 's_avg', 'e_avg'));
     }
 
     /**
@@ -54,19 +71,24 @@ class ActivityController extends Controller
         //start_timeとend_time,durationを正しい値にする
         $start = Carbon::parse("$request->date $request->start_time");
         $end = Carbon::parse("$request->date $request->end_time");
+        $end_time = $end;
+        
+        $start_h = intval($start->format('H'));
+        $end_h = intval($end->format('H'));
+
         if ($start->gt($end))
         {
-            $end->addDay();
+            $end_time = $end->copy()->addDay();
         }
 
         // 重複チェック
         $exists = Activity::where('user_id', Auth::id())
-        ->where(function ($query) use ($start, $end) {
-            $query->whereBetween('start_time', [$start, $end])
-            ->orWhereBetween('end_time', [$start, $end])
-            ->orWhere(function ($query2) use ($start, $end) {
+        ->where(function ($query) use ($start, $end_time) {
+            $query->whereBetween('start_time', [$start, $end_time])
+            ->orWhereBetween('end_time', [$start, $end_time])
+            ->orWhere(function ($query2) use ($start, $end_time) {
                 $query2->where('start_time', '<=', $start)
-                ->where('end_time', '>=', $end);
+                ->where('end_time', '>=', $end_time);
             });
         })
         ->exists();
@@ -76,65 +98,57 @@ class ActivityController extends Controller
             ->withErrors(['time' => '指定した時間はすでに他の記録と重複しています。'])
             ->withInput();
         }
-        // function duration($start, $end){
-        //     $diff = $start->diff($end);
-        //     $hours = $diff->h + $diff->d * 24;
-        //     $minutes = $diff->i;
-    
-        //     $duration = "{$hours}時間{$minutes}分";
-        //     return $duration;
-        // }
         
         $activities = [];
         //11時でグラフが切れるため、11時を挟んでいたらデータを分ける
-        $start_h = intval($start->format('H'));
-        $end_h = intval($end->format('H'));
+        // $start_h = intval($start->format('H'));
+        // $end_h = intval($end->format('H'));
         if($start_h < $end_h){
             if($start_h < 11 & 11 < $end_h){
                 //11時で区切ると表示ができないため
-                $center_e = $start->copy()->setTime(11, 00);
-                $center_s = $center_e->addDay();
-                $duration1 = $this->duration($start, $center_e);
+                $center = $start->copy()->setTime(11, 00);
+                // $center_s = $center_e->copy()->addDay();
+                $duration1 = $this->duration($start, $center);
                 $activities[] = [
                     'start_time' => $start,
-                    'end_time' => $center_e,
+                    'end_time' => $center,
                     'duration' => $duration1,
                 ];
-                $duration2 = $this->duration($center_s, $end);
+                $duration2 = $this->duration($center, $end);
                 $activities[] = [
-                    'start_time' => $center_s,
-                    'end_time' => $end->copy()->addDay(),
+                    'start_time' => $center,
+                    'end_time' => $end_time,
                     'duration' => $duration2,
                 ];
             }else{
                 $duration3 = $this->duration($start, $end);
                 $activities[] = [
                     'start_time' => $start,
-                    'end_time' => $end,
+                    'end_time' => $end_time,
                     'duration' => $duration3,
                 ];
             }
         }elseif($start_h > $end_h){
             if($end_h > 11){
                 $center_e = $start->copy()->setTime(11, 00);
-                $center_s = $center_e->addDay();
+                $center_s = $center_e->copy()->addDay();
                 $duration1 = $this->duration($start, $center_e);
                 $activities[] = [
                     'start_time' => $start,
                     'end_time' => $center_e,
                     'duration' => $duration1,
                 ];
-                $duration2 = $this->duration($center_s, $end);
+                $duration2 = $this->duration($center_s, $end_time);
                 $activities[] = [
                     'start_time' => $center_s,
-                    'end_time' => $end->copy()->addDay(),
+                    'end_time' => $end_time,
                     'duration' => $duration2,
                 ];
             }else{
                 $duration3 = $this->duration($start, $end);
                 $activities[] = [
                     'start_time' => $start,
-                    'end_time' => $end,
+                    'end_time' => $end_time,
                     'duration' => $duration3,
                 ];
             }
@@ -143,7 +157,7 @@ class ActivityController extends Controller
             $duration3 = $this->duration($start, $end);
             $activities[] = [
                 'start_time' => $start,
-                'end_time' => $end,
+                'end_time' => $end_time,
                 'duration' => $duration3,
             ];
         }
@@ -169,15 +183,41 @@ class ActivityController extends Controller
      */
     public function show(Activity $activity)
     {
-        //
+        $date = Carbon::parse($activity->start_time)->format('Y-m-d');
+
+        if($activity->type === 'sleep'){
+            $file = 'activities.sleepShow';
+        }else{
+            $file = 'activities.exerciseShow';
+        }
+
+        return view($file, compact('activity', 'date'));
     }
+
+    // public function sleepshow(Activity $activity)
+    // {
+    //     return view('activities.sleepShow', compact('activity'));
+    // }
+
+    // public function exerciseShow(Activity $activity)
+    // {
+    //     return view('activities.exerciseShow', compact('activity'));
+    // }
 
     /**
      * Show the form for editing the specified resource.
      */
     public function edit(Activity $activity)
     {
-        //
+        // $date = Carbon::parse($activity->start_time)->format('Y-m-d');
+
+        // if($activity->type === 'sleep'){
+        //     $file = 'activities.sleepEdit';
+        // }else{
+        //     $file = 'activities.exerciseEdit';
+        // }
+
+        // return view($file, compact('activity', 'date'));
     }
 
     /**
@@ -191,17 +231,20 @@ class ActivityController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Activity $activity)
+    public function destroy(Request $request,Activity $activity)
     {
-        //
+        $activity->delete();
+
+        $request->session()->flash('message', '削除しました');
+        return to_route('analysis.timeGraph');
     }
 
     private function duration(Carbon $start, Carbon $end): string
     {
         $diff = $start->diff($end);
-        $hours = $diff->h + $diff->d * 24;
         $minutes = $diff->i;
+        $hours = round(($diff->d * 24) + $diff->h + ($minutes / 60), 1);
 
-        return "{$hours}時間{$minutes}分";
+        return $hours;
     }
 }
